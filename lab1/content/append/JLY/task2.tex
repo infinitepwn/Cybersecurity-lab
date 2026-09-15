@@ -1,0 +1,99 @@
+% 江李阳个人实验二记录：使用 Wireshark 分析 Web 访问过程流量
+
+\subsection{实验二：使用 Wireshark 分析 Web 访问过程流量}
+
+本附录记录个人完成实验二时的实际操作和抓包结果。实验目标网址按照本组实验约定使用
+\url{http://www.seclab.online}。由于本次实验的网络配置经过调整，下面的环境表以本次截图中
+实际使用的地址为准，与实验一最终采用的网络配置并不完全相同。
+
+\subsubsection{实验环境}
+
+\begin{table}[htbp]
+    \centering
+    \caption{实验二个人实验环境}
+    \label{tab:jly-task2-environment}
+    \small
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.8cm}X}
+        \toprule
+        项目 & 实际配置或说明 \\
+        \midrule
+        客户端（Attacker） & Ubuntu，网卡 \texttt{ens33}，IP 为 192.168.3.10/24，默认网关为 192.168.3.1 \\
+        DNS 服务器 & 192.168.2.53，客户端通过 UDP 53 端口进行域名查询 \\
+        OpenWRT & 内网接口地址为 192.168.3.1；配置截图中还使用了 DNS 侧地址 192.168.2.1 \\
+        External Server & IP 为 192.168.4.105，提供本次 HTTP 访问服务 \\
+        抓包工具 & Wireshark，捕获接口为客户端的 \texttt{ens33} \\
+        访问目标 & \url{http://www.seclab.online} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{实验过程}
+
+首先在客户端启动 Wireshark，选择 \texttt{ens33} 网卡进行抓包，然后访问目标网址。启动抓包
+时客户端会产生一些系统背景流量，实际分析时使用显示过滤器缩小到目标 DNS、ARP 和 HTTP
+连接。客户端启动 Wireshark 的情况如图\ref{fig:jly-task2-wireshark-start}所示。
+
+\labfigure[1\linewidth]{figures/append/JLY/task2/ens2_3_wireshark_start.png}{客户端在 ens33 网卡上启动 Wireshark}{fig:jly-task2-wireshark-start}
+
+在访问目标网址之前，客户端需要解析域名。使用下面的过滤器：
+\begin{center}
+    \texttt{dns.qry.name=="www.seclab.online"}
+\end{center}
+
+可以观察到客户端
+192.168.3.10 向 DNS 服务器 192.168.2.53 发出查询，并收到
+\texttt{www.seclab.online} 的 A 记录 192.168.4.105。由此得到 Web 服务器的 IP 地址，
+后续 TCP 连接的目标就是该地址。
+
+\labfigure[1\linewidth]{figures/append/JLY/task2/exp2_3_DNS_resolve.png}{www.seclab.online 的 DNS 查询与响应}{fig:jly-task2-dns}
+
+清空或重新触发 ARP 缓存后，客户端还需要获得默认网关的 MAC 地址。抓包结果显示网关
+192.168.3.1 对应的 MAC 地址为
+\texttt{00:0c:29:c2:73:ed}，客户端网卡的 MAC 地址为
+\texttt{00:0c:29:bf:ed:f6}。这说明客户端访问其他网段的服务器时，二层下一跳是 OpenWRT，
+而不是直接使用 External Server 的 MAC 地址。
+
+\labfigure[1\linewidth]{figures/append/JLY/task2/exp2_3_arp.png}{客户端与默认网关之间的 ARP 报文}{fig:jly-task2-arp}
+
+随后使用过滤器
+\texttt{ip.addr == 192.168.4.105 and tcp.port == 80} 查看客户端与 Web 服务器之间的
+TCP 和 HTTP 报文。抓包中可以观察到客户端发送 SYN、服务器返回 SYN/ACK、客户端再发送
+ACK，三次握手完成后开始传输 HTTP 数据。之后还能看到客户端的 HTTP GET 请求以及服务器
+返回的 302、200 等 HTTP 响应，最后连接通过 FIN/ACK 进行关闭。
+
+\labfigure[1\linewidth]{figures/append/JLY/task2/exp2_3_TCP_hadnshake.png}{客户端与 Web 服务器之间的 TCP 和 HTTP 报文}{fig:jly-task2-tcp}
+
+在 Wireshark 中选中 HTTP 数据包并使用 ``Follow TCP Stream''，可以还原本次 HTTP 会话的
+请求和响应。服务器在响应中设置了
+\texttt{lab\_session=exp2-client-demo} Cookie，客户端后续请求又通过 Cookie 字段携带了
+相同的值，说明 Cookie 在 HTTP 会话中的设置和回传过程可以直接从明文 HTTP 流中观察到。
+
+\labfigure[1\linewidth]{figures/append/JLY/task2/exp2_3_cookie.png}{Follow TCP Stream 中的 HTTP 请求、响应与 Cookie}{fig:jly-task2-cookie}
+
+\subsubsection{实验结果}
+
+本次抓包结果对应关系如下：
+
+\begin{table}[htbp]
+    \centering
+    \caption{实验二主要报文分析结果}
+    \label{tab:jly-task2-result}
+    \small
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.6cm}X}
+        \toprule
+        报文或阶段 & 抓包结果 \\
+        \midrule
+        DNS & 192.168.3.10 查询 192.168.2.53，\texttt{www.seclab.online} 的 A 记录为 192.168.4.105 \\
+        ARP & 客户端解析默认网关 192.168.3.1 的 MAC 地址 \\
+        TCP & 192.168.3.10 与 192.168.4.105:80 完成三次握手 \\
+        HTTP & 客户端发送 GET，服务器返回 302、200 等响应 \\
+        Cookie & 服务器设置 \texttt{lab\_session=exp2-client-demo}，客户端后续请求携带该 Cookie \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+由此可以看出，一次 Web 访问并不是单独的一条 HTTP 报文，而是先经过 ARP 获得下一跳地址，
+再通过 DNS 将域名解析为 IP 地址，然后建立 TCP 连接，最后在连接上传输 HTTP 请求和响应。
+Wireshark 的协议过滤和 Follow TCP Stream 功能可以把这些不同层次的报文关联起来。
