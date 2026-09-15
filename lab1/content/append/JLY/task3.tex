@@ -1,0 +1,84 @@
+% 江李阳个人实验三记录：使用 Scapy 构造 ICMP Echo Request
+
+\subsection{实验三：使用 Scapy 构造 ICMP Echo Request}
+
+本附录记录个人使用 Scapy 构造并发送 ICMP Echo Request 的过程。该次截图记录采用了与
+实验一不同的地址配置，并且按照实验指导书的要求使用 External Server 的地址作为伪造源
+地址，因此环境信息和报文中的源、目的地址需要分别说明。
+
+\clearpage
+\subsubsection{实验环境}
+
+\begin{table}[htbp]
+    \centering
+    \caption{实验三个人实验环境}
+    \label{tab:jly-task3-environment}
+    \small
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.8cm}X}
+        \toprule
+        项目 & 实际配置或说明 \\
+        \midrule
+        Attacker & Ubuntu，网卡 \texttt{ens33}，实际 IP 为 192.168.2.100/24，默认网关为 192.168.2.1 \\
+        Victim & Ubuntu，网卡 \texttt{ens33}，实际 IP 为 192.168.3.10/24，默认网关为 192.168.3.1 \\
+        伪造源地址 & 192.168.4.105；该地址只写入 IP 首部，并不是 Attacker 网卡的实际地址 \\
+        工具 & Scapy 2.4.4，以 root 权限启动 \\
+        负载 & \texttt{I come from Attacker-192.168.2.100} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{数据包构造与发送}
+
+首先在 Attacker 上使用 root 权限启动 Scapy。实验中先构造 IP 层，将源地址设置为
+192.168.4.105、目的地址设置为 Victim 的 192.168.3.10；再构造默认 ICMP 层和自定义负载，
+最后使用 ``/'' 运算符将三层内容组合为一个数据包。
+
+\begin{lstlisting}[language=bash,caption={以 root 权限启动 Scapy}]
+sudo scapy
+\end{lstlisting}
+
+\begin{lstlisting}[language=python,caption={使用 Scapy 构造 ICMP Echo Request}]
+ip_layer = IP(src="192.168.4.105", dst="192.168.3.10")
+icmp_layer = ICMP()
+payload = "I come from Attacker-192.168.2.100"
+icmp_request = ip_layer / icmp_layer / payload
+icmp_request.show()
+send(icmp_request)
+\end{lstlisting}
+
+Scapy 中 \texttt{ICMP()} 使用默认字段值，其中 \texttt{type=8} 表示 Echo Request，
+\texttt{code=0} 表示该请求没有错误子类型。调用 \texttt{show()} 后，可以看到 IP 层的
+源地址为 192.168.4.105、目的地址为 192.168.3.10，ICMP 层为 Echo Request，Raw 层中
+保存了自定义字符串。
+
+\labfigure[1\linewidth]{figures/append/JLY/task3/exp3_attacker_start_scapy.png}{Attacker 以 root 权限启动 Scapy}{fig:jly-task3-scapy-start}
+\labfigure[1\linewidth]{figures/append/JLY/task3/exp3_scapy_payload.png}{Scapy 构造的 ICMP Echo Request 及 show 输出}{fig:jly-task3-payload}
+
+调用 \texttt{send(icmp\_request)} 后，Scapy 显示 ``Sent 1 packets.''，表示已经发送一个
+数据包。由于这里使用的是 \texttt{send()}，实际二层封装和下一跳选择由系统路由完成；本次
+实验的重点是观察 Scapy 构造的 IP、ICMP 和 Raw 数据内容。
+
+\subsubsection{Victim 侧验证}
+
+在 Victim 侧使用 tcpdump 监听 \texttt{ens33}，过滤 ICMP 报文。抓包结果显示：
+
+\begin{itemize}
+    \item 收到的 ICMP Echo Request 的源 IP 为 192.168.4.105，目的 IP 为 192.168.3.10；
+    \item Raw 负载中可以看到 ``I come from Attacker-192.168.2.100''；
+    \item Victim 返回源 IP 为 192.168.3.10、目的 IP 为 192.168.4.105 的 ICMP Echo Reply。
+\end{itemize}
+
+因此，Victim 能够根据 ICMP 的请求类型进行响应，同时抓包结果也证明了 Attacker 成功将
+伪造的源地址和自定义负载放入了发送的 IP 数据包中。
+
+\labfigure[1\linewidth]{figures/append/JLY/task3/exp3_attacker_set.png}{Attacker 的地址配置及连通性验证}{fig:jly-task3-attacker-config}
+\labfigure[1\linewidth]{figures/append/JLY/task3/exp3_victim_set.png}{Victim 的地址配置及网关连通性验证}{fig:jly-task3-victim-config}
+\labfigure[1\linewidth]{figures/append/JLY/task3/exp3_attacker_send_to_victim_exact.png}{Scapy 发送数据包及 Victim 侧 tcpdump 抓包结果}{fig:jly-task3-result}
+
+\subsubsection{实验结果}
+
+本次实验成功构造并发送了一个 ICMP Echo Request。需要注意的是，Attacker 的真实地址是
+192.168.2.100，而报文 IP 首部中的源地址是 192.168.4.105，因此该实验展示的是带有源 IP
+伪造的 ICMP 报文，而不是普通的 Attacker 到 Victim 的 ping。Victim 侧收到请求并返回
+Echo Reply，说明报文构造、发送以及抓包验证均完成。
