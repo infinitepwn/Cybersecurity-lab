@@ -1,4 +1,144 @@
 % 实验三：使用 Scapy 构造 ICMP Echo Request
 % 在此填写 Scapy 代码、报文字段、Victim 侧抓包结果和分析。
 \section{实验三：使用 Scapy 构造 ICMP Echo Request}
+\subsection{实验目的}
+\begin{enumerate}
+\item 学习和掌握Scapy工具的功能和使用方法，掌握Scapy构造包的流程;
+\item 掌握ICMP包的结构，了解一个完整的ICMP包都需要满足哪些条件；
+\item 实践网络数据包的伪造与发送，使用Scapy向受害者发送伪造的ICMP数据包。
+\end{enumerate}
 
+\subsection{实验配置}
+本实验使用docker搭建实验环境，Client(Attacker)通过OpenWRT路由器与其他主机进行通信.
+
+值得注意的是,docker中的ubuntu是没有GUI界面的,但是我们可以通过远程桌面来实现
+
+这个已经有现成的镜像实现了，直接pull kasmweb/ubuntu-focal-desktop:1.16.0
+
+详见附录中的docker环境配置,包括dockerfile也在里面,目录如下
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_structure.png}
+    \caption{实验配置目录}
+\end{figure}
+
+配置文件填写完之后，就可以开始部署
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+如果想要进入某个机器，就用
+\begin{lstlisting}
+docker exec -it server bash
+\end{lstlisting}
+特别地,对于victim，我们利用远程桌面来连接
+在主机浏览器访问https://localhost:6901,需要登录
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_login.png}
+    \caption{登录远程桌面}
+\end{figure}
+然后就就可以和其他虚拟机软件一样操控桌面端的ubuntu了,使用体验差距不大，比较方便的是直接同步了剪贴板
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_desktop.png}
+    \caption{进入桌面}
+\end{figure}
+\begin{table}[H]
+    \centering
+    \caption{实验三各虚拟机网络接口及 IP 地址配置}
+    \label{tab:exp3_network}
+    \begin{tabular}{cccc}
+        \toprule
+        虚拟机 & Linux 内网卡名 & IP 地址 & 默认网关 \\
+        \midrule
+        Victim(Client)      & \texttt{eth0} & \texttt{192.168.3.10/24}  & \texttt{192.168.3.254} \\
+        Attacker  & \texttt{eth0} & \texttt{192.168.2.100/24}  & \texttt{192.168.2.1} \\
+        User  & \texttt{eth0} & \texttt{192.168.4.105/24} & \texttt{192.168.4.1} \\
+        OpenWRT     & \texttt{eth0}   & \texttt{192.168.3.1/24}   & -- \\
+        OpenWRT     & \texttt{eth1}   & \texttt{192.168.4.1/24}   & -- \\
+        OpenWRT     & \texttt{eth2}   & \texttt{192.168.2.1/24}   & -- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+网络拓扑如图所示：
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_network.png}
+    \caption{实验三网络拓扑图}
+    \label{fig:exp3_network}
+\end{figure}
+
+\subsection{实验过程}
+打开scapy,
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_scapy.png}
+    \caption{打开scapy}
+    \label{fig:exp3_scapy}
+\end{figure}
+\subsubsection{创建ip层}
+将源ip（src）设置为User ip，将目的ip（dst）设置成Victim ip；
+\begin{lstlisting}[language=bash]
+ip_layer = IP(src="192.168.4.105", dst="192.168.3.10") 
+\end{lstlisting}
+通过ls(ICMP)查看ICMP层默认字段值，其中type=8 和 code=0 组合起来表示 ICMP Echo Request（Ping） 数据包，未设置的字段将使用其默认值填充;
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_icmp.png}
+    \caption{创建ip层、查看ICMP层}
+    \label{fig:exp3_icmp}
+\end{figure}
+\subsubsection{创建icmp层、payload}
+\begin{lstlisting}[language=bash]
+icmp_layer = ICMP() #创建ICMP层
+\end{lstlisting}
+创建负载数据；
+\begin{lstlisting}[language=bash]
+payload = "I come from Attacker-192.168.2.100"#载荷的内容
+\end{lstlisting}
+\subsubsection{构造ICMP Echo Request数据包}
+将IP层、ICMP层、负载层三者进行组合，生成一个Ping数据包；
+\begin{lstlisting}[language=bash]
+icmp_request = ip_layer / icmp_layer / payload
+\end{lstlisting}
+通过.show()方法来查看已构造好的数据包内容；
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_icmpcreate.png}
+    \caption{创建ICMP层}
+    \label{fig:exp3_icmpcreate}
+\end{figure}
+\subsubsection{发送数据包}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_send.png}
+    \caption{发送数据包}
+    \label{fig:exp3_send}
+\end{figure}
+\subsubsection{收到数据包}
+打开wireshark,然后监测eth0的流量，注意要过滤掉6901端口的流量，这个是用来远程桌面的
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_receive.png}
+    \caption{收到数据包}
+    \label{fig:exp3_receive}
+\end{figure}
+但是为什么这里是192.168.3.254?这是因为Docker的网络默认会打开ip masquerade,也就是ip伪装,网关会将源IP地址替换为自身的地址\cite{docker-bridge}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_docker.png}
+    \caption{docker ip伪装}
+\end{figure}
+有趣的是，这正是我们这个实验要做的事，不就是伪装吗？
+我们需要在docker-compose.yaml里修改一下这个参数(附录里是修改完的)
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_docker_revise.png}
+    \caption{修改docker-compose.yaml}
+\end{figure}
+改完再发送就成功了
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/exp3_success.png}
+    \caption{收到数据包}
+\end{figure}

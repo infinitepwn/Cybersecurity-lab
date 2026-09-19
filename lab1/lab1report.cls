@@ -77,6 +77,21 @@
   xleftmargin=2em,
   framexleftmargin=1.5em
 }
+\lstdefinelanguage{yaml}{
+  morekeywords={
+    true,false,null,
+    services,networks,image,build,
+    container_name,hostname,privileged,
+    restart,cap_add,interface_name,
+    ipv4_address,subnet,gateway
+  },
+  keywordstyle=\color{blue}\bfseries,
+  comment=[l]{\#},
+  commentstyle=\color{gray}\itshape,
+  morestring=[b]',
+  morestring=[b]",
+  stringstyle=\color{teal}
+}
 
 % 直接引用的脚注标记使用 ①②③ 等圆圈数字；使用 TeX 圆圈排版，避免
 % 不同系统中文字体对 U+2460 等字符支持不一致。

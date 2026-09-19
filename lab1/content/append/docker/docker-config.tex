@@ -1,0 +1,211 @@
+\subsubsection{docker-compose.yml}
+\begin{lstlisting}[language=yaml]
+services:
+  route:
+    build:
+      context: ./openwrt
+    container_name: route
+    hostname: route
+    privileged: true
+    restart: unless-stopped
+
+    networks:
+      internal:
+        interface_name: eth0
+        ipv4_address: 192.168.3.1
+
+      external:
+        interface_name: eth1
+        ipv4_address: 192.168.4.1
+
+      dns_net:
+        interface_name: eth2
+        ipv4_address: 192.168.2.1
+  internal-server:
+    image: ubuntu:20.04
+    platform: linux/arm64
+    container_name: internal-server
+    hostname: internal-server
+
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    networks:
+      internal:
+        interface_name: eth0
+        ipv4_address: 192.168.3.200
+
+    command: >
+      bash -c "
+      apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 iputils-ping tcpdump net-tools && ip route del default && ip route add default via 192.168.3.1 && tail -f /dev/null
+      "
+
+  client:
+    build:
+      context: ./client
+
+    container_name: client
+    hostname: client
+
+    privileged: true
+    shm_size: "512m"
+
+    ports:
+      - "6901:6901"
+
+    environment:
+      VNC_PW: password
+
+    networks:
+      internal:
+        interface_name: eth0
+        ipv4_address: 192.168.3.10
+
+
+  dns:
+    build:
+      context: ./dns
+    container_name: dns
+    hostname: dns
+
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    depends_on:
+      - route
+
+    networks:
+      dns_net:
+        interface_name: eth0
+        ipv4_address: 192.168.2.53
+
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route del default || true
+        ip route add default via 192.168.2.1 dev eth0
+        exec dnsmasq --no-daemon
+  attacker:
+    build:
+      context: ./attacker
+    container_name: attacker
+    hostname: attacker
+
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    depends_on:
+      - route
+
+    networks:
+      dns_net:
+        interface_name: eth0
+        ipv4_address: 192.168.2.100
+
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route del default || true
+        ip route add default via 192.168.2.1 dev eth0
+        tail -f /dev/null
+
+
+  server:
+    build:
+      context: ./server
+    container_name: server
+    hostname: server
+
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    depends_on:
+      - route
+
+    networks:
+      external:
+        interface_name: eth0
+        ipv4_address: 192.168.4.105
+
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route del default || true
+        ip route add default via 192.168.4.1 dev eth0
+        exec nginx -g 'daemon off;'
+
+
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.3.0/24
+          gateway: 192.168.3.254
+
+  external:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+    ipam:
+      config:
+        - subnet: 192.168.4.0/24
+          gateway: 192.168.4.254
+
+  dns_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.2.0/24
+          gateway: 192.168.2.254
+
+\end{lstlisting}
+\subsubsection{Dockerfile}
+openwrt
+\begin{lstlisting}[language=yaml]
+FROM scratch
+ADD openwrt-armsr-armv8-rootfs.tar.gz /
+CMD ["/sbin/init"]
+\end{lstlisting}
+client(victim)
+\begin{lstlisting}[language=yaml]
+FROM kasmweb/ubuntu-focal-desktop:1.16.0
+
+USER root
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y \
+        wireshark \
+        tcpdump \
+        iproute2 \
+        iputils-ping \
+        net-tools \
+        curl \
+        vim \
+        netcat-openbsd && \
+    rm -rf /var/lib/apt/lists/*
+\end{lstlisting}
+attacker
+\begin{lstlisting}[language=yaml]
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y \
+        iproute2 \
+        iputils-ping \
+        net-tools \
+        scapy \
+        tcpdump \
+				vim \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
+\end{lstlisting}
