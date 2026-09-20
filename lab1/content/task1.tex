@@ -100,19 +100,10 @@ ip route
         & 192.168.4.105
         & 192.168.4.105
         & 192.168.3.10 \\
-        掩码错（初始）
+        掩码错
         & \texttt{00:0c:29:bf:ed:f6}
         & \texttt{ff:ff:ff:ff:ff:ff}
         & \texttt{00:0c:29:c2:73:ed}
-        & \texttt{00:0c:29:bf:ed:f6}
-        & 192.168.3.10
-        & 192.168.3.200
-        & 192.168.3.200
-        & 192.168.3.10 \\
-        掩码错（重定向后）
-        & \texttt{00:0c:29:bf:ed:f6}
-        & \texttt{ff:ff:ff:ff:ff:ff}
-        & \texttt{00:0c:29:2c:12:a8}
         & \texttt{00:0c:29:bf:ed:f6}
         & 192.168.3.10
         & 192.168.3.200
@@ -122,7 +113,24 @@ ip route
     \end{tabular}}
 \end{table}
 
-根据实际的Ping结果应当指出，“掩码错”对应两个阶段：初始阶段Client向网关192.168.3.1发出ARP请求，ARP响应来自OpenWRT；收到ICMP Redirect后，Client再次发出ARP请求，ARP响应来自Victim。两个阶段的ICMP源、目的IP仍然是192.168.3.10和192.168.3.200，变化的是以太网帧的下一跳MAC地址。
+表\ref{tab:task1-flow}中的“掩码错”行按照实验指导书记录首次发包阶段的结果：Client根据/28掩码将Victim判断为远端主机，因此先解析默认网关的MAC地址。实际实验中，OpenWRT随后返回了ICMP Redirect，Client再解析Victim的MAC地址并直接发送ICMP报文，具体过程见表\ref{tab:task1-redirect}。
+
+\begin{table}[H]
+    \centering
+    \caption{掩码错误情况下的ICMP Redirect补充记录}
+    \label{tab:task1-redirect}
+    \small
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
+        \toprule
+        阶段 & 报文类型 & 实际观察结果 \\
+        \midrule
+        首次转发 & ICMP Redirect & OpenWRT（192.168.3.1）向Client（192.168.3.10）发送Redirect，并提示新的下一跳为192.168.3.200。 \\
+        重定向后 & ARP & Client重新广播请求192.168.3.200的MAC地址，ARP响应源MAC为Victim的\texttt{00:0c:29:2c:12:a8}。 \\
+        重定向后 & ICMP Echo & Echo Request为192.168.3.10到192.168.3.200，Echo Reply为192.168.3.200到192.168.3.10。 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
 \subsection{三次操作的结果差异及原因分析}
 

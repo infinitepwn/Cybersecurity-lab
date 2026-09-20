@@ -7,7 +7,7 @@
 \instructor{郭山清}
 \college{网络空间安全学院}
 \major{密码科学与技术2024级一班}
-\completiondate{2026 年  9月  10日}
+\completiondate{2026 年  9月  20日}
 
 % 参考资料写入 references.bib；直接引用使用 \labquote[页码]{文献键}。
 \addbibresource{references.bib}
@@ -22,8 +22,28 @@
 \input{content/2lab_principle.tex}
 \section{实验设置}
 % 在此填写 VMware、OpenWRT、网卡、地址和工具版本等实验设置。
-实验步骤、网络拓扑结构等符合实验指导书的要求，但具体每人实验实验时使用的网卡、IP地址、MAC地址等
-并不完全一致，具体每个实验前会详述本实验设置。
+实验步骤和网络拓扑结构均按照实验指导书完成。由于三名成员分别在自己的实验环境中独立完成了全部三个实验，
+实际使用的网卡、IP地址和MAC地址可能存在差异，下面先说明本组的分工方式，再在各实验中列出对应的实际环境。
+
+\subsection{小组分工与实验说明}
+
+本组采用协作撰写方式：三名成员均独立完成实验一、实验二和实验三，正文再按照任务进行分工，分别由一名成员负责整理一项实验的主要过程、截图和分析。因而，正文不同任务中的网卡名称、IP地址、MAC地址以及虚拟化平台可能并不完全相同，这些差异均来自成员的实际实验环境，而不是实验步骤不一致。
+
+\begin{table}[H]
+    \centering
+    \caption{本组实验报告撰写分工}
+    \label{tab:group-division}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.2cm} X}
+        \toprule
+        成员 & 正文负责任务 & 说明 \\
+        \midrule
+        江李阳 & 实验一：tcpdump分析ICMP流量 & 负责实验一正文、流量记录表和三种通信场景的结果分析。 \\
+        王健一 & 实验二：Wireshark分析Web访问流量 & 负责实验二正文、DNS、ARP、TCP、HTTP和Cookie流量分析。 \\
+        邱泽辉 & 实验三：Scapy构造ICMP Echo Request & 负责实验三正文、Scapy报文构造和Victim侧抓包结果分析。 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
 % 三个任务分别维护在 content/ 目录中。
 \input{content/task1}
@@ -42,8 +62,6 @@
 \section{附录：关键代码}
 % 在此填写或使用 \lstinputlisting 引入完整、可运行、带注释的关键代码。
 \input{content/append/docker/docker-config}
-\section{附录：江李阳个人实验记录}
-\input{content/append/JLY/task2}
-\input{content/append/JLY/task3}
+
 
 \end{document}
