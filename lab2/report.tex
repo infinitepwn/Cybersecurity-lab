@@ -1,0 +1,49 @@
+\documentclass{lab1report}
+\usepackage{float}
+
+% 封面信息：请填写本组实际信息。
+\course{网络安全}
+\reporttitle{实验报告}
+\student{江李阳(202400460042)王健一(202400460037)邱泽辉(202400460046)}
+\instructor{郭山清}
+\college{网络空间安全学院}
+\major{密码科学与技术2024级一班}
+\completiondate{\today}
+
+% 参考资料写入 references.bib；直接引用使用 \labquote[页码]{文献键}。
+\addbibresource{references.bib}
+
+\begin{document}
+\makecover
+
+\input{content/1lab_target.tex}
+\input{content/2lab_principle.tex}
+
+\section{实验设置}
+
+\subsection{实验分工与配置说明}
+
+本组采用分工协作的方式完成本次实验。各成员在自己的 环境中独立完成实验、记录终端输出和抓包截图，再按照实验分工汇总整理报告。由于虚拟机网卡连接、网卡名称、地址分配和实验推进顺序可能存在差异，实际配置并不严格与实验指导书逐项相同，但保持拓扑关系和实验现象满足要求。
+具体分工如下:
+\todo{分工表}
+
+% \subsection{整体网络拓扑}
+% \todo{填写整体拓扑结构，并在此插入拓扑图。}
+
+\input{content/task1.tex}
+
+\section{实验二：中间人攻击与 HTTP Digest 认证分析}
+\todo{本大实验暂留，待补充拓扑、投毒、流量捕获和离线口令验证过程。}
+
+\section{实验讨论}
+\input{content/discussion.tex}
+
+\section{参考资料}
+\printbibliography[heading=none]
+
+\newpage
+\appendix
+\section{附录：关键代码}
+\input{content/append/key-code.tex}
+
+\end{document}

@@ -1,0 +1,9 @@
+\subsubsection{ARP reply}
+该方式中，攻击者通过向受害者发送伪造的ARP Reply响应，使得受害者将正确IP(目标设备IP)与错误MAC地址(攻击者指定的MAC地址)关联起来，
+此时当受害者像向目标设备通信时，就会将消息发送给错误MAC地址对应的设备，即导致信息的被拦截，具体过程如下:
+\begin{itemize}
+    \item victim广播ARP请求，此时含victim自身IP、MAC地址的ARP请求被局域网内attacker收到并记录下来，假victim是请求server的MAC地址
+    \item attacker抢先在server之前更快的回复伪造的ARP Reply响应(IP是server的IP，但MAC地址是attacker的MAC地址)。此时victim认为这就是server发来的ARP Reply，于是便记录下该ARP缓存信息，且此后即使在此收到真的server的ARP Reply也会丢弃不管。
+    \item victim后续发送给server的流量都会被attacker截获。这是因为前面victim的ARP缓存表被投毒污染，导致发送给server 的IP的数据包的实际MAC地址用错误的MAC地址，因此表面看是发给了Server对应IP，但最终包是发给了attacker。
+\end{itemize}
+可以看到ARP reply攻击是要打时间差，即attacker需要抢先在server回复ARP响应前发出伪造的ARP响应，实际攻击中为了提高准确率，attacker往往会持续发送该伪造ARP reply。

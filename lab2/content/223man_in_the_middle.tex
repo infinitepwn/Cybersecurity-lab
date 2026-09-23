@@ -1,0 +1,11 @@
+\subsection{Telnet 攻击}
+中间人攻击是指在在ARP缓存投毒攻击的基础上，劫持victim主机与server之间的流量。主要方式是：attacker
+定期/持续广播伪造的ARP Reply报文，其中将server的IP地址与attacker自身的MAC地址绑定，当victim收到该ARP Reply
+并将这种对应关系记录到ARP缓存表中，就实现了ARP 缓存投毒。随后victim发往server的流量都会先流经attacker，之后再由attacker转法给server。
+这里实现的是劫持victim发往server的上行流量，如果要截获server发往victim的下行流量，可以改为污染网关的ARP缓存表，使得server发给victim的流量在到达网关后，网关直接发给
+attacker，由attacker截获后再发给victim。
+以第一种为例，具体的攻击流程总结如下：
+\begin{itemize}
+    \item[1] victim的流量被attacker劫持。这一步通过attacker污染victim的ARP缓存实现，此后victim访问server的IP分组封装成MAC帧后，目的地址指向attacker的MAC地址，目的IP为server的IP地址，最终帧发给了attacker。
+    \item[2] attacker转发流量到server。这里attacker开启IP转发功能，将劫持到的数据流量发给server，使得server能正常接收并响应victim的访问请求。attacker在转发前可以修改相关帧的信息，使得劫持流量攻击不易被察觉。
+\end{itemize}
