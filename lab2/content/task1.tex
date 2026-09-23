@@ -1,0 +1,174 @@
+% 实验一：ARP 缓存投毒（包含 ARP Request 和 ARP Reply 两种方式）
+\section{实验一：ARP 缓存污染}
+
+\subsection{实验一（1）：ARP Request 方式的缓存污染}
+
+\subsubsection{实验配置}
+
+本实验在 VMware 中搭建由 Victim、Attacker 和 Server 组成的局域网。三台虚拟机均通过 \texttt{ens33} 接入同一个自定义二层网络，地址位于 \texttt{192.168.3.0/24} 网段。实验中使用的实际地址如下表所示。由于 Victim 与 Server 位于同一子网，Victim 直接通过 ARP 解析 Server 的 MAC 地址，访问 Server 时不需要经过默认网关。
+
+\begin{table}[H]
+    \centering
+    \caption{ARP Request 投毒实验的实际网络配置}
+    \label{tab:task1-network}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\linewidth}{l l l l X}
+        \toprule
+        主机角色 & 网卡 & IPv4 地址 & MAC 地址 & 说明 \\
+        \midrule
+        Victim & \texttt{ens33} & \texttt{192.168.3.10/24} & \texttt{00:0c:29:2c:12:a8} & 发起到 Server 的 ICMP 测试 \\
+        Attacker & \texttt{ens33} & \texttt{192.168.3.129/24} & \texttt{00:0c:29:bf:ed:f6} & 运行 Scapy 脚本发送伪造 ARP Request \\
+        Server & \texttt{ens33} & \texttt{192.168.3.200/24} & \texttt{00:0c:29:3a:96:65} & Victim 访问的目标主机 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+攻击前，先在 Victim 上验证到 Server 的通信正常，并查看 Server 对应的邻居项，同时在 Victim 上观察正常的 ARP 和 ICMP 报文：
+
+\begin{lstlisting}[language=bash,caption={攻击前 Victim 的通信检查命令}]
+# Victim
+ip neigh show 192.168.3.200 dev ens33
+ping -c 1 192.168.3.200
+
+\end{lstlisting}
+
+攻击前的抓包结果中，Victim（\texttt{192.168.3.10}）能够收到 Server（\texttt{192.168.3.200}）的 Echo Reply；ARP Reply 中 Server 的 MAC 地址为 \texttt{00:0c:29:3a:96:65}，与表\ref{tab:task1-network}中的实际配置一致，如图\ref{fig:task1-baseline}所示。
+
+\labfigure[0.84\linewidth]{figures/exp1_correct_ping.png}{攻击前 Victim 与 Server 通信正常，抓包可见真实 Server MAC 地址}{fig:task1-baseline}
+
+\begin{samepage}
+\subsubsection{实验过程}
+
+在 Attacker 上分别打开抓包终端和脚本终端，先启动抓包，再执行 ARP Request 脚本：
+
+\begin{lstlisting}[language=bash,caption={Attacker 上抓取 Victim 流量并执行 ARP Request 脚本}]
+# 终端一：抓取 Victim 的 ICMP 报文
+sudo tcpdump -ni ens33 -e 'icmp and host 192.168.3.10'
+
+# 终端二：发送 ARP Request
+sudo python3 arp_request.py
+\end{lstlisting}
+\end{samepage}
+
+ARP Request 脚本的核心代码如下。脚本从实际网卡读取 Attacker 的地址，并将 Server 的 IP 地址和 Attacker 的 MAC 地址组合到伪造请求中；其中目标协议地址设置为 Victim 的地址，使 Victim 处理该广播报文并更新邻居表。
+
+\begin{lstlisting}[language=Python,caption={ARP Request 投毒脚本}]
+#!/usr/bin/env python3
+from scapy.all import ARP, Ether, get_if_addr, get_if_hwaddr, sendp
+
+iface = "ens33"
+attacker_ip = get_if_addr(iface)
+attacker_mac = get_if_hwaddr(iface)
+if attacker_ip != "192.168.3.129":
+    raise SystemExit(f"unexpected address on {iface}: {attacker_ip}")
+
+packet = (
+    Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") /
+    ARP(op=1, hwsrc=attacker_mac, psrc="192.168.3.200",
+        hwdst="00:00:00:00:00:00", pdst="192.168.3.10")
+)
+packet.show()
+sendp(packet, iface=iface, count=3, inter=1, verbose=True)
+\end{lstlisting}
+
+Attacker 使用 Scapy 构造并广播 ARP Request，连续发送 3 次。报文的以太网目的地址为广播地址，ARP 操作码为 Request；发送方协议地址填写 Server 的 IP 地址 \texttt{192.168.3.200}，发送方硬件地址填写 Attacker 的 MAC 地址 \texttt{00:0c:29:bf:ed:f6}，目标协议地址填写 Victim 的 IP 地址 \texttt{192.168.3.10}。因此，报文向 Victim 声明的映射是“\texttt{192.168.3.200} 对应 \texttt{00:0c:29:bf:ed:f6}”。脚本的关键报文字段和发送结果见图\ref{fig:task1-script}。
+
+\labfigure[0.90\linewidth]{figures/exp1_script_code.png}{Attacker 上 ARP Request 投毒脚本及报文字段}{fig:task1-script}
+
+脚本发送后，在 Victim 上检查邻居表。实验截图显示，\texttt{192.168.3.200} 对应的链路层地址变为 Attacker 的 \texttt{00:0c:29:bf:ed:f6}，而不是 Server 的真实地址，说明 Victim 的 ARP 缓存已被污染。图\ref{fig:task1-poison}同时记录了脚本发送的 3 个 ARP Request 及 Victim 上的错误邻居项。
+
+\labfigure[0.90\linewidth]{figures/exp1_arp_repquest_success.png}{ARP Request 已发送，Victim 邻居表中的 Server 映射指向 Attacker}{fig:task1-poison}
+
+随后在 Victim 上执行 \texttt{ping -c 4 192.168.3.200}，并在 Attacker 上观察抓包。Victim 的 ping 结果为 4 个报文全部丢失；Attacker 的抓包则显示，以太网帧从 Victim 的 MAC 地址 \texttt{00:0c:29:2c:12:a8} 发往 Attacker 的 MAC 地址 \texttt{00:0c:29:bf:ed:f6}，但 IP 层源、目的地址仍分别为 \texttt{192.168.3.10} 和 \texttt{192.168.3.200}。这表明 Victim 根据被污染的 ARP 项将发往 Server 的帧交给了 Attacker。由于本实验阶段未在 Attacker 上配置转发，Attacker 收到 Echo Request 后没有将其继续转发给 Server，因此 Victim 未收到 Echo Reply。抓包与 ping 结果见图\ref{fig:task1-intercept}。
+
+\labfigure[0.90\linewidth]{figures/exp1_arp_request_get_icmp_info.png}{Victim 的 ping 超时；Attacker 抓到以太网目的 MAC 为自身地址的 ICMP Echo Request}{fig:task1-intercept}
+
+\begin{samepage}
+\subsubsection{实验结果与恢复}
+
+本实验成功验证了 ARP Request 投毒会使 Victim 将 Server 的 IP 地址错误映射到 Attacker 的 MAC 地址，并使 Victim 发往 Server 的以太网帧到达 Attacker。该结果证明了二层流量转向已经发生；由于当时没有开启转发，通信中断而非形成可持续的中间人转发，这是本实验观察到的预期现象。
+\end{samepage}
+
+实验结束后，在 Victim 上删除被污染的邻居项，再次访问 Server。Victim 会重新发起正常的 ARP 解析并学习 Server 的真实 MAC 地址。截图显示，执行恢复后 ping 为 4 个报文全部收到、丢包率为 0\%，邻居项也恢复为 \texttt{00:0c:29:3a:96:65}，如图\ref{fig:task1-recovery}所示。
+
+\begin{lstlisting}[language=bash,caption={清除错误邻居项并验证恢复}]
+sudo ip neigh flush to 192.168.3.200 dev ens33
+ping -c 4 192.168.3.200
+arp -a
+\end{lstlisting}
+
+\labfigure[0.90\linewidth]{figures/exp1_flush_wrong_arp_reping_success.png}{清除错误 ARP 项后，Victim 重新学习 Server 的真实 MAC 并恢复通信}{fig:task1-recovery}
+
+\subsection{实验一（2）：ARP Reply 方式的缓存污染}
+
+\subsubsection{实验配置}
+
+ARP Reply 小实验仍使用三台通过 \texttt{ens33} 接入同一二层网络的虚拟机，但本次实验在开始前重新清理 Victim 的邻居缓存，并以实际观察到的地址为准。攻击目标是让 Victim 把 Server 的 IP 错误映射到 Attacker 的 MAC，Server 的真实 MAC 仅用于攻击前后的对照。
+
+\begin{table}[H]
+    \centering
+    \caption{ARP Reply 投毒实验的实际网络配置}
+    \label{tab:task1-reply-network}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\linewidth}{l l l l X}
+        \toprule
+        主机角色 & 网卡 & IPv4 地址 & MAC 地址 & 本次实验用途 \\
+        \midrule
+        Victim & \texttt{ens33} & \texttt{192.168.3.10/24} & \texttt{00:0c:29:2c:12:a8} & 接收伪造 ARP Reply 并发起 ping \\
+        Attacker & \texttt{ens33} & \texttt{192.168.3.129/24} & \texttt{00:0c:29:bf:ed:f6} & 持续发送伪造 ARP Reply \\
+        Server & \texttt{ens33} & \texttt{192.168.3.200/24} & \texttt{00:0c:29:3a:96:65} & 提供真实 MAC 对照 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+实验开始时在 Victim 上清空邻居项并确认正常通信，在 Attacker 上查看网卡 MAC：
+
+\begin{lstlisting}[language=bash,caption={ARP Reply 实验开始前的检查}]
+# Victim
+sudo ip neigh flush all
+arp -a
+ping -c 4 192.168.3.200
+
+# Attacker
+ip -br link show ens33
+\end{lstlisting}
+
+\subsubsection{实验过程}
+
+ARP Reply 方式不依赖 Victim 是否刚好发出 ARP Request，而是由 Attacker 持续向 Victim 单播发送伪造的 ARP Reply。报文以 Victim 的 MAC 为以太网目的地址，ARP 操作码为 Reply（\texttt{op=2}），协议源地址伪装为 Server 的 \texttt{192.168.3.200}，硬件源地址使用 Attacker 的 \texttt{00:0c:29:bf:ed:f6}。Scapy 脚本如下：
+
+\begin{lstlisting}[language=Python,caption={ARP Reply 持续投毒脚本}]
+#!/usr/bin/env python3
+from scapy.all import ARP, Ether, get_if_addr, get_if_hwaddr, sendp
+
+iface = "ens33"
+attacker_ip = get_if_addr(iface)
+attacker_mac = get_if_hwaddr(iface)
+if attacker_ip != "192.168.3.129":
+    raise SystemExit(f"unexpected address on {iface}: {attacker_ip}")
+
+victim_ip = "192.168.3.10"
+victim_mac = "00:0c:29:2c:12:a8"
+server_ip = "192.168.3.200"
+
+reply = (
+    Ether(src=attacker_mac, dst=victim_mac) /
+    ARP(op=2, hwsrc=attacker_mac, hwdst=victim_mac,
+        psrc=server_ip, pdst=victim_ip)
+)
+reply.show()
+sendp(reply, iface=iface, loop=1, inter=0.01, verbose=False)
+\end{lstlisting}
+
+脚本运行后，在 Victim 上查看邻居表。截图显示，\texttt{192.168.3.200} 的链路层地址被改写为 Attacker 的 MAC 地址 \texttt{00:0c:29:bf:ed:f6}，而不是 Server 的真实地址；Attacker 终端显示 ARP Reply 报文的源协议地址为 \texttt{192.168.3.200}、目的协议地址为 \texttt{192.168.3.10}，如图\ref{fig:task1-reply-code}和图\ref{fig:task1-reply-poison}所示。
+
+\labfigure[0.90\linewidth]{figures/exp2_attacker_arp__reply_code.png}{Attacker 上 ARP Reply 投毒脚本及报文字段}{fig:task1-reply-code}
+\labfigure[0.90\linewidth]{figures/exp2_arp_reply_attack_success.png}{ARP Reply 投毒后 Victim 的邻居项指向 Attacker}{fig:task1-reply-poison}
+
+在 Victim 上再次执行 \texttt{ping -c 4 192.168.3.200}，同时在 Attacker 上抓取来自 Victim 的 ICMP 报文。实验中一次测试出现 50\% 的丢包，随后在持续发送伪造 Reply 的情况下出现 100\% 丢包；这反映了真实 Server 的 ARP 响应与伪造响应之间存在竞争。稳定污染后，Victim 发出的 Echo Request 的 IP 目的地址仍是 \texttt{192.168.3.200}，但以太网目的 MAC 已经变为 Attacker 的 MAC。由于本小实验没有开启 Attacker 的 IP 转发，报文被 Attacker 接收后没有继续送往 Server，因此 Victim 收不到 Echo Reply。抓包结果如图\ref{fig:task1-reply-icmp}所示。
+
+\labfigure[0.90\linewidth]{figures/exp2_arp_reply_icmp_get.png}{ARP Reply 投毒后 Attacker 捕获 Victim 发出的 ICMP Echo Request}{fig:task1-reply-icmp}
+
+\subsubsection{实验结果}
+
+ARP Reply 实验验证了：Attacker 可以通过持续发送单播伪造响应，直接覆盖 Victim 中 Server 的 IP--MAC 映射；与 ARP Request 方法相比，Reply 方法不需要等待 Victim 的下一次 ARP 请求，但需要持续发送以维持错误映射。两种方法在本实验中都实现了相同的二层流量转向，区别在于伪造报文的触发方式和发送对象。

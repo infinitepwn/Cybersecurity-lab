@@ -1,0 +1,41 @@
+# LaTeX process output
+build/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+
+# Keep the final PDF in dist/, but ignore any auxiliary files copied there.
+dist/*.aux
+dist/*.bbl
+dist/*.bcf
+dist/*.blg
+dist/*.fdb_latexmk
+dist/*.fls
+dist/*.lof
+dist/*.log
+dist/*.lot
+dist/*.out
+dist/*.run.xml
+dist/*.synctex.gz
+dist/*.toc
+dist/*.xdv
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak

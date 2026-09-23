@@ -1,0 +1,14 @@
+\section{实验原理}
+
+\input{content/21arp_precess.tex}
+
+\subsection{ARP 缓存污染原理}
+ARP缓存投毒主要利用了ARP协议缺少有效认证机制、无法确认ARP响应的真实性的缺陷(即上述ARP协议流程中，A实际无法确认发送ARP响应的真的是B)。攻击者通过主动破坏MAC地址表来实现截获、篡改或中断网路设备之间的通信。
+主要的攻击方式包括ARP reply和ARP Request。
+\input{content/221arp_reply.tex}
+\input{content/222arp_request.tex}
+
+\input{content/223man_in_the_middle.tex}
+
+% \subsection{HTTP Digest 认证与口令验证原理}
+% \todo{填写相关原理。}

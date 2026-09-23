@@ -1,0 +1,9 @@
+\subsection{ARP协议工作流程}
+ARP协议流程可分为4步（假设A发起与B的通信）：
+\begin{itemize}
+    \item 发起ARP请求：当主机A要发起与B的通信时，A会先查看自己的ARP缓存表，看是否已经记录了B的IP地址和MAC地址的映射，如果有就直接用缓存映射；如果没有，
+A就在局域网广播一个ARP请求包，询问B的IP地址对应的MAC地址。
+    \item 广播消息:ARP请求是在局域网广播的(MAC地址为\texttt{ff:ff:ff:ff:ff:ff})，因此局域网内所有主机都会收到该ARP请求包，其中包含了A的IP地址和MAC地址、目标B的IP地址。
+    \item ARP响应：局域网(B若不在局域网，则由网关来回复A，且网关重复ARP查询过程)中的主机B识别到该ARP请求的目的IP地址与自身的IP地址相匹配时，它会向A回复一个ARP响应，告诉A自己的MAC地址（即ARP响应中包含了B的IP地址和MAC地址）。
+    \item 添加缓存：A收到B的ARP响应后，会将B的IP地址和MAC地址的映射关系写入A的ARP缓存表。此时A就可以根据B的MAC地址发送以太网帧了。此后A再此与B通信(缓存过期之前)时，直接查ARP缓存表就可以知道B的MAC地址了。
+\end{itemize}
