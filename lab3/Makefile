@@ -15,7 +15,7 @@ all: pdf
 
 pdf: $(PDF)
 
-$(PDF): $(SOURCE) lab1report.cls references.bib $(CONTENT_TEX) $(FIGURES)
+$(PDF): $(SOURCE) lab1report.cls $(CONTENT_TEX) $(FIGURES)
 	mkdir -p $(BUILD_DIR) $(DIST_DIR)
 	$(LATEXMK) -xelatex -interaction=nonstopmode -halt-on-error \
 		-outdir=$(BUILD_DIR) $(SOURCE)

@@ -1,0 +1,48 @@
+\subsection{资产探测与端口扫描}
+\subsubsection{TCP端口扫描}
+TCP端口扫描包括全连接扫描和半连接扫描，其中全连接扫描指attacker尝试与victim/待扫描主机建立TCP连接，如果
+attacker收到victim发来的SYN+ACK，说明该端口开放，否则如果收到RST说明该端口关闭，通过这种方式，attacker就能确认victim上哪些端口是开放的，
+哪些是关闭的。全连接扫描与半连接扫描的区别在于victim恢复SYN+ACK后，前者将恢复一个ACK，两者将完成TCP3次握手，建立起真正的TCP连接，而后者只是回复一个RST，两台主机间并不会建立真正的TCP连接。
+相比之下，全连接扫描准确率更高，但效率较低，且完整的连接过程会留下明显的日志记录；而半连接扫描的扫描速度更快，具有一定的隐蔽性。
+更多TCP端口扫描方式包括：
+\begin{itemize}
+    \item TCP Maimon扫描：attacker向目标端口发送同时设置FIN和ACK标志的错误数据包，如果端口开放，将忽略这类非法数据包；如果端口关闭，则会响应RST报文。
+    \item TCP NULL扫描：attacker发送一个不带任何TCP标志的数据包，即所有位都设为0，没有SYN、ACK、FIN等任何标志。这类数据包同样不是正常的TCP数据包，因此如果端口是关闭的，victim通常会回复一个RST数据包；如果端口是开放的，或者被过滤，victim不会做任何响应。
+    \item TCP FIN扫描：attacker发送一个只设置了FIN标志位的TCP数据包。FIN通常用于正常TCP连接终止，但如果在连接初始化阶段发送就不是正常TCP数据包了。类似NULL扫描，如果端口是关闭的，victim将回复一个RST数据包，；如果没有响应或一个明显的ICMP错误响应，一般意味着端口开放或被过滤。
+    \item TCP Xmas扫描：在数据包中设置多个标志位(FIN,PSH,URG)，如果端口关闭，则会回复RST；如果端口开放或被过滤，则可能不回复。
+\end{itemize}
+
+下面具体介绍两种隐蔽扫描方式：
+\begin{itemize}
+    \item idlesan(空闲扫描)：借助一台空闲主机C，具体过程如下：
+    \begin{itemize}
+        \item (1)attacker向空闲主机C发送ICMP请求，得到C的ICMP响应，并记录下对应的\texttt{IPID}=n;
+        \item (2)attacker向victim待扫描端口发送TCP的SYN数据包，其中源IP为主机C的IP，端口为待探测端口。
+        \item (3i)如果victim对应端口开放，将向C回复一个SYN+ACK。C直接收到SYN+ACK将会将其视为非法数据包，直接回复一个RST，此时\texttt{IPID}=$n+1$；
+        \item (3ii)如果victim对应端口关闭，则将回复一个RST，C收到后不做响应，此时C的\texttt{IPID}还是n。
+        \item (4)attacker向空闲主机发送ICMP请求，得到C的ICMP响应和对应\texttt{IPID}，如果此时收到的C的\texttt{IPID}值为n+2，则对应上面(3i)的情况，对应端口开防；如果\texttt{IPID}值为$n+1$，则对应上面(3ii)的情况，
+        说明对应待探测端口关闭。
+    \end{itemize}
+    这种方法的优点是在扫描时不泄露attacker自身的信息，只借助空闲主机C的返回情况来判断待扫描victim端口的情况。但这种方法也有非常大的缺点，这种方法严重依赖空闲主机C的\texttt{IPID}参数全局自增的特点，而由于这个参数实际并没有什么含义，目前绝大多数终端的IPID采用随机数或基于哈希函数来计算\texttt{IPID}值，attacker难以实现预测。其次，
+    该方法还要求空闲主机C必须是完全空闲的，否则当(4)发送ICMP后收到的\texttt{IPID}值为n+2时，实际attacker并不能确认使得C上一步\texttt{IPID}自增为n+1的到底是victim回复的SYN+ACK导致的，还是其他主机与C通信导致的，这就导致了现象无法确定结果，进而造成扫描准确率下降。
+
+    \item TCP RST速率限制：该方法基于TCP RST速率的隐蔽扫描方法，利用了操作系统的TCP协议栈在短时间内能够发送的RST报文数量有限这一固有特性，具体来说：
+    \begin{itemize}
+        \item (1)attacker向victim待探测端口发送大量SYN数据包，其中源IP为主机C的IP，目的端口为待扫描端口。
+        \item (2i)如果victim对应的端口开放，则victim会向C发送大量SYN+ACK报文，此时C针对这些非法报文将回复大量RST报文并最终达到RST速率限制；
+        \item (2ii)如果victim对应的端口关闭，则victim会向C发送大量的RST报文，C将忽略这些RST报文不做回复，因而没有达到RST速率限制。
+        \item (3)attacker向C发送ICMP NULL，如果C能回复RST报文，说明它没有达到RST速率限制，对应情况(2ii)说明victim上端口关闭；反之如果C不能回复RST报文，说明它达到了RST速率限制，对应情况(2i)，说明victim上对应端口开放。
+    \end{itemize}
+\end{itemize}
+
+
+\subsubsection{资产探测}
+包括设备与协议的指纹识别和操作系统的指纹识别。
+\begin{itemize}
+    \item 设备与协议指纹：不同网络设备、协议实现和软件应用在网络连接中会表现出细微的差别，这些在通信连接中表现出来的独特特性被称为设备、系统或软件的指纹。
+    \item 操作系统的指纹：
+    \begin{itemize}
+        \item 被动指纹：如观察目标发送的SYN/SYN-ACK/RST等包中的TTL、Windows Size、IPID、TCP选项等，不同操作系统中的初始TTL值设置并不相同：Windows系统中通常为128，UNIX类系统一般为64；通过观察HTTP headers、Cookie特征、TLS指纹、DNS查询模式等组合来推断操作系统或应用。
+        \item 主动指纹：（TCP/IP主动栈探测）向目标发送一系列特殊构造的TCP/IP包，根据包的细微差异匹配指纹库，Nmap就是一个著名的实现例子；连接目标服务端口(如SSH、HTTP、SMB、FTP等)，读取banner或协议特性来识别操作系统或发行版倾向，这种方法简单但容易被管理员修改或禁用横幅。
+    \end{itemize}
+\end{itemize}
