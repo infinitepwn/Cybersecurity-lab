@@ -11,7 +11,7 @@
 \completiondate{\today}
 
 % 参考资料写入 references.bib；直接引用使用 \labquote[页码]{文献键}。
-\addbibresource{references.bib}
+% \addbibresource{references.bib}
 
 \begin{document}
 \makecover
@@ -34,30 +34,29 @@
         \toprule
         成员 & 正文负责任务 & 说明 \\
         \midrule
-        江李阳 & 实验一：ARP Request 方式实现 ARP 缓存污染 & 负责实验一正文、网络拓扑的搭建和ARP Request 投毒实验的结果分析。 \\
-        王健一 & 实验二：ARP 中间人攻击 & 负责实验二正文、网络拓扑的搭建、ARP 中间人攻击和HTTP Digest 认证分析。 \\
-        邱泽辉 & 实验一：ARP Reply 方式实现 ARP 缓存污染 & 负责实验一正文、网络拓扑的搭建和ARP Reply 投毒实验的结果分析。 \\
+        江李阳 & 实验一：1\\
+        王健一 & 实验二：2\\
+        邱泽辉 & 实验一：3 \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-% \subsection{整体网络拓扑}
-% \todo{填写整体拓扑结构，并在此插入拓扑图。}
 
-\input{content/task1.tex}
+% \input{content/task1.tex}
 
-\input{content/task3.tex}
+% \input{content/task3.tex}
 
 \section{实验讨论}
 \input{content/discussion.tex}
 
 \section{参考资料}
-\nocite{labguide,rfc7616,scapy,wireshark}
-\printbibliography[heading=none]
+% \nocite{labguide,rfc7616,scapy,wireshark}
+% \printbibliography[heading=none]
 
 \newpage
 \appendix
 \section{附录：关键代码}
-\input{content/append/key-code.tex}
+\label{appendix:digest_crack}
+% \input{content/append/key-code.tex}
 
 \end{document}
