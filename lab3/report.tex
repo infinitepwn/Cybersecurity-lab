@@ -1,5 +1,6 @@
 \documentclass{lab1report}
-\usepackage{float}
+\usepackage{float}     % 支持 [H] 固定浮动体位置
+\usepackage{booktabs}  % 支持 \toprule 等三线表命令
 
 % 封面信息：请填写本组实际信息。
 \course{网络安全}
@@ -42,11 +43,12 @@
 \end{table}
 
 
-% \input{content/task1.tex}
+\input{content/task1.tex}
 
-% \input{content/task3.tex}
+\input{content/task2.tex}
 
 \input{content/task3.tex}
+
 \input{content/task4.tex}
 
 \section{实验讨论}
