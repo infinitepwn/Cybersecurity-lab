@@ -177,6 +177,7 @@ curl -I --max-time 5 http://192.168.4.105
 
 为了继续完成实验指导中“比较开启与关闭 SYN Cookies 时服务器半连接数量”的要求，本实验先查看系统的相关队列参数，实际得到 \texttt{tcp\_max\_syn\_backlog=256}、\texttt{somaxconn=4096}。这些参数说明内核存在相应的队列容量设置，但不能将其中任一数值直接视为 \texttt{SYN\_RECV} 统计的固定上限。随后保持目的地址、目标端口和报文结构不变，仅将脚本中的发送循环次数从 30 增加到 500，以尝试扩大服务器的半连接压力。调整后的关键代码如下：
 
+\Needspace{14\baselineskip}
 \begin{lstlisting}[language=Python,caption={第二轮仅修改测试循环次数}]
 for i in range(500):
     ip_packet = IP(src=source_ip, dst=target_ip)
