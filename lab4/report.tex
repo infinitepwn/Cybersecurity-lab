@@ -1,0 +1,41 @@
+\documentclass{lab1report}
+\usepackage{float}     % 支持 [H] 固定浮动体位置
+\usepackage{booktabs}  % 支持 \toprule 等三线表命令
+\usepackage{needspace} % 需要时将完整代码块移至下一页
+
+% 封面信息
+\course{网络安全}
+\reporttitle{实验报告}
+\student{江李阳(202400460042)王健一(202400460037)邱泽辉(202400460046)}
+\instructor{郭山清}
+\college{网络空间安全学院}
+\major{密码科学与技术2024级一班}
+\completiondate{\today}
+
+% 参考资料写入 references.bib；直接引用使用 \labquote[页码]{文献键}。
+% \addbibresource{references.bib}
+
+% 四个任务的起始一级标题居中，其他一级标题沿用左对齐样式。
+\newcommand{\labinputexperiment}[1]{%
+    \titleformat{\section}[block]{\centering\heiti\zihao{3}}{\thesection}{0.75em}{}%
+    \input{#1}%
+    \titleformat{\section}{\heiti\zihao{3}}{\thesection}{0.75em}{}%
+}
+
+\begin{document}
+\makecover
+
+\input{content/1lab_target.tex}
+\input{content/2lab_principle.tex}
+
+\labinputexperiment{content/task1.tex}
+\labinputexperiment{content/task2.tex}
+\labinputexperiment{content/task3.tex}
+\labinputexperiment{content/task4.tex}
+
+\input{content/discussion.tex}
+
+\appendix
+\input{content/append/key-code.tex}
+
+\end{document}

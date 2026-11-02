@@ -41,7 +41,7 @@
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.78\linewidth]{figures/task3/telnet_before_attack(1).png}
+    \includegraphics[width=0.68\linewidth]{figures/task3/telnet_before_attack(1).png}
     \caption{攻击前，User 分别成功登录两台服务器的 \texttt{Telnet} 服务}
     \label{fig:task3-telnet-before}
 \end{figure}
@@ -50,7 +50,7 @@
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task3/ssh_before_attack.png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.74\linewidth]{figures/task3/ssh_before_attack.png}
     \caption{攻击前，User 分别通过 \texttt{SSH} 登录正常服务器和受害者服务器}
     \label{fig:task3-ssh-before}
 \end{figure}
@@ -59,7 +59,7 @@
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task3/ftp_before_attack(1).png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.74\linewidth]{figures/task3/ftp_before_attack(1).png}
     \caption{攻击前，User 均可登录两台服务器的 \texttt{FTP} 服务}
     \label{fig:task3-ftp-before}
 \end{figure}
@@ -77,6 +77,7 @@ capture_filter = (
 
 回调函数从捕获报文中读取 \texttt{TCP} 源、目的端口和确认号，将 IP 地址及端口方向反转，并把服务器报文中的确认号作为伪造 RST 的序列号。脚本只对带 ACK 标志的报文发送 RST，核心处理如下：
 
+\Needspace{30\baselineskip}
 \begin{lstlisting}[language=Python,caption={根据捕获到的确认号构造 \texttt{TCP} RST 报文}]
 def packet_callback(packet):
     if not (packet.haslayer(IP) and packet.haslayer(TCP)):
@@ -115,7 +116,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task3/telnet_after_attack(1).png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.74\linewidth]{figures/task3/telnet_after_attack(1).png}
     \caption{\texttt{TCP} 重置期间，正常服务器 \texttt{Telnet} 可用，受害者服务器连接被重置}
     \label{fig:task3-telnet-after}
 \end{figure}
@@ -124,7 +125,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=720bp 0 0 0,clip,width=0.88\linewidth]{figures/task3/ssh_after_attack(1).png}
+    \includegraphics[trim=720bp 0 0 0,clip,width=0.74\linewidth]{figures/task3/ssh_after_attack(1).png}
     \caption{\texttt{TCP} 重置期间，正常服务器 \texttt{SSH} 可用，受害者服务器连接被重置}
     \label{fig:task3-ssh-after}
 \end{figure}
@@ -133,7 +134,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.98\linewidth]{figures/task3/ftp_after_attack(1).png}
+    \includegraphics[width=0.90\linewidth]{figures/task3/ftp_after_attack(1).png}
     \caption{\texttt{TCP} 重置期间，正常服务器 \texttt{FTP} 可用，受害者服务器 \texttt{FTP} 连接关闭}
     \label{fig:task3-ftp-after}
 \end{figure}
@@ -144,7 +145,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.98\linewidth]{figures/task3/http_short_response.png}
+    \includegraphics[width=0.90\linewidth]{figures/task3/http_short_response.png}
     \caption{小型 \texttt{HTTP} 响应在 RST 生效前完成传输}
     \label{fig:task3-http-small}
 \end{figure}
@@ -153,7 +154,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.98\linewidth]{figures/task3/http_large_before_attack(1).png}
+    \includegraphics[width=0.90\linewidth]{figures/task3/http_large_before_attack(1).png}
     \caption{攻击前，User 均能完整下载两台服务器提供的测试文件}
     \label{fig:task3-http-large-before}
 \end{figure}
@@ -162,7 +163,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.98\linewidth]{figures/task3/http_reset_effect(1).png}
+    \includegraphics[width=0.90\linewidth]{figures/task3/http_reset_effect(1).png}
     \caption{限速 \texttt{HTTP} 下载时，受害者服务器连接中断，正常服务器下载完成}
     \label{fig:task3-http-after}
 \end{figure}
@@ -173,7 +174,7 @@ sniff(
 
 \begin{figure}[H]
     \centering
-    \includegraphics[trim=0 0 576bp 0,clip,width=0.76\linewidth]{figures/task3/http_recovery(1).png}
+    \includegraphics[trim=0 0 576bp 0,clip,width=0.70\linewidth]{figures/task3/http_recovery(1).png}
     \caption{停止 RST 监听后，受害者服务器的完整 \texttt{HTTP} 下载恢复}
     \label{fig:task3-recovery}
 \end{figure}

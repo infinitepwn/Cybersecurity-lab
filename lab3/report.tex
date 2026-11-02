@@ -1,6 +1,7 @@
 \documentclass{lab1report}
 \usepackage{float}     % 支持 [H] 固定浮动体位置
 \usepackage{booktabs}  % 支持 \toprule 等三线表命令
+\usepackage{needspace} % 需要时将完整代码块移至下一页
 
 % 封面信息：请填写本组实际信息。
 \course{网络安全}
@@ -13,6 +14,13 @@
 
 % 参考资料写入 references.bib；直接引用使用 \labquote[页码]{文献键}。
 % \addbibresource{references.bib}
+
+% 仅将四次实验的起始一级标题居中，其他一级标题沿用左对齐样式。
+\newcommand{\labinputexperiment}[1]{%
+    \titleformat{\section}[block]{\centering\heiti\zihao{3}}{\thesection}{0.75em}{}%
+    \input{#1}%
+    \titleformat{\section}{\heiti\zihao{3}}{\thesection}{0.75em}{}%
+}
 
 \begin{document}
 \makecover
@@ -43,13 +51,13 @@
 \end{table}
 
 
-\input{content/task1.tex}
+\labinputexperiment{content/task1.tex}
 
-\input{content/task2.tex}
+\labinputexperiment{content/task2.tex}
 
-\input{content/task3.tex}
+\labinputexperiment{content/task3.tex}
 
-\input{content/task4.tex}
+\labinputexperiment{content/task4.tex}
 
 \section{实验讨论}
 \input{content/discussion.tex}
