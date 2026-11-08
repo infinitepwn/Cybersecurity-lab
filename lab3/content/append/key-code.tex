@@ -1,3 +1,17 @@
+
+\subsection{实验二：\texttt{SYN Flood} 攻击脚本}
+
+实验二使用 Scapy 构造并发送 TCP SYN 报文，通过伪造源 IP 地址、随机生成源端口，并将 TCP 标志位设置为 \texttt{SYN}，模拟无法完成三次握手的连接请求。在受害者服务器上观察 \texttt{SYN\_RECV} 状态，并比较开启和关闭 \texttt{SYN Cookies} 时的半连接数量。
+
+实验中首先发送 30 个 SYN 报文进行初步验证，随后将发送数量增加至 500，以进一步观察半连接状态的变化。完整实现见代码清单~\ref{lst:append-task2-syn}。
+
+\lstinputlisting[
+    language=Python,
+    basicstyle=\ttfamily\footnotesize,
+    caption={实验二 TCP SYN 报文构造与发送脚本},
+    label={lst:append-task2-syn}
+]{../../Experiment3/task2/syn_test.py}
+
 \subsection{实验三：\texttt{TCP} 连接重置脚本}
 
 实验三的脚本监听镜像到 Attacker 的受害者服务器响应报文，并依据其中的 TCP 确认号构造面向受害者服务器的 RST 报文。完整实现见代码清单~\ref{lst:append-task3-rst}。
