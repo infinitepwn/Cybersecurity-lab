@@ -144,9 +144,17 @@
   % 固定标签列和可伸缩内容列：内容过长时在内容列内自动换行，
   % 同时保证所有内容列从同一位置开始。
   \noindent\hspace*{2em}%
-  \begin{tabularx}{0.90\textwidth}{@{}>{\raggedright\arraybackslash}p{0.22\textwidth}@{\hspace{1em}}>{\raggedright\arraybackslash}X@{}}
+  \begin{tabularx}{0.90\textwidth}{@{}>{\raggedright\arraybackslash}p{0.22\textwidth}@{\hspace{1em}}>{\centering\arraybackslash}X@{}}
     #1 & #2\\[-0.2ex]
     \cline{2-2}
+  \end{tabularx}\par
+}
+
+\newcommand{\lab@coverstudentline}[1]{%
+  % 学生姓名跨三行显示，标签在三行高度内垂直居中。
+  \noindent\hspace*{2em}%
+  \begin{tabularx}{0.90\textwidth}{@{}>{\raggedright\arraybackslash}m{0.22\textwidth}@{\hspace{1em}}X@{}}
+    学生姓名 & #1
   \end{tabularx}\par
 }
 
@@ -163,7 +171,7 @@
     \vfill
     \begin{flushleft}
       {\heiti\fontsize{15pt}{28pt}\selectfont
-        \lab@coverline{学生姓名}{\lab@student}
+        \lab@coverstudentline{\lab@student}
         \lab@coverline{指导教师}{\lab@instructor}
         \lab@coverline{学    院}{\lab@college}
         \lab@coverline{专业班级}{\lab@major}
