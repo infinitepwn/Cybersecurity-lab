@@ -2,11 +2,16 @@
 \usepackage{float}     % 支持 [H] 固定浮动体位置
 \usepackage{booktabs}  % 支持 \toprule 等三线表命令
 \usepackage{needspace} % 需要时将完整代码块移至下一页
+\usepackage{multirow}  % 表格中跨行显示主机角色和用途
 
 % 封面信息
 \course{网络安全}
 \reporttitle{实验报告}
-\student{江李阳(202400460042)王健一(202400460037)邱泽辉(202400460046)}
+\student{\begin{tabularx}{\linewidth}{@{}>{\centering\arraybackslash}X@{}}
+江李阳（202400460042）\\[-0.2ex]\hline
+王健一（202400460037）\\[-0.2ex]\hline
+邱泽辉（202400460046）\\[-0.2ex]\hline
+\end{tabularx}}
 \instructor{郭山清}
 \college{网络空间安全学院}
 \major{密码科学与技术2024级一班}

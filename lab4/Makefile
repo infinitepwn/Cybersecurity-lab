@@ -17,7 +17,8 @@ pdf: $(PDF)
 
 $(PDF): $(SOURCE) lab1report.cls $(CONTENT_TEX) $(FIGURES)
 	mkdir -p $(BUILD_DIR) $(DIST_DIR)
-	$(LATEXMK) -xelatex -interaction=nonstopmode -halt-on-error \
+# The current Lab4 report has no active bibliography; skip the unused Biber run.
+	$(LATEXMK) -bibtex- -xelatex -interaction=nonstopmode -halt-on-error \
 		-outdir=$(BUILD_DIR) $(SOURCE)
 	cp $(BUILD_DIR)/report.pdf $(PDF)
 
